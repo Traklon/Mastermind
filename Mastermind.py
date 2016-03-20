@@ -1,135 +1,185 @@
-def compte (l):
-	occ = [0 for i in range (1,8)]
-	for elt in l:
-		occ[elt] = occ[elt]+1
-	return occ
-		
+# coding: utf8
 
-def conv (nb):
-	l = []
-	while (nb > 0):
-		l.append (nb%10)
-		nb = nb//10
-	l.reverse()
-	return l
-	
-def transfo (l):
-	nb = 0
-	for elt in l:
-		nb = nb + elt
-		nb = 10*nb
-	return (nb//10)
-	
-def rep (code, occ, essai):
-	occ2 = compte(essai)
-	ntot = 0
-	nn = 0
-	for i in range (1,7):
-		ntot = ntot + min(occ[i], occ2[i])
-	for i in range (0,4):
-		nn = nn + (code[i] == essai[i])
-	return (nn, ntot-nn)
-	
-def poss2 (poss, S):
-	l = []
-	for (i,elt) in enumerate(poss):
-		if (S[i]):
-			l.append(transfo(elt))
-	return l
-	
-def poss3 (poss, S):
-	l = []
-	for (i,elt) in enumerate(poss):
-		if (S[i]):
-			l.append(elt)
-	return l
-	
-def conseil (poss, possC, possS, possSC, S):
-	mini = 1296
-	curr = 0
-	for elt in poss:
-		maxi = 0
-		tab = [[0 for i in range (0,5)] for i in range (0,5)]
-		for (i,e) in enumerate(possS):
-			(nn,nb) = rep(e, possSC[i], elt)
-			if (tab[nn][nb] == 0):
-				tab[nn][nb] = e
-				tot = 0
-				for (i1,e1) in enumerate(possS):
-					if (rep(e1, possSC[i1], elt) == (nn,nb)):
-						tot += 1
-				if (tot > maxi):
-					maxi = tot
-		if (maxi < mini):
-			mini = maxi
-			curr = elt
-	return transfo(curr)
-	
-def jeuLibre ():
-	from random import randint
-	code = 0
-	for i in range (1,5):
-		code+=randint(1,6)
-		code = code*10
-	codeNb = code//10
-	code = conv(codeNb)
-	occ = compte(code)
-	nbEssai = 6
-	poss = [[0 for i in range (0,4)] for j in range (0,1296)]
-	S = [True for j in range (0,1296)]
-	for (j,elt) in enumerate(poss):
-		tmp = j
-		elt[0] = tmp//216+1
-		tmp = tmp%216
-		elt[1] = tmp//36+1
-		tmp = tmp%36
-		elt[2] = tmp//6+1
-		tmp = tmp%6
-		elt[3] = tmp+1
-	possC = [[] for j in range (0,1296)]
-	for (i,elt) in enumerate(poss):
-		possC[i] = compte(elt)
-	while(nbEssai > 0):
-		essai = input();
-		if (essai == 'etat'):
-			print(poss2(poss,S))
-			print("")
-			continue
-		if (essai == 'conseil'):
-			possS = poss3(poss,S)
-			possSC = [[] for j in range (0,1296)]
-			for (i,elt) in enumerate(possS):
-				possSC[i] = compte(elt)
-			print(conseil(poss, possC, possS, possSC, S))
-			print('')
-			continue
-		essai = int(essai)
-		(nn,nb) = rep(code, occ, conv(essai))
-		for (i,elt) in enumerate(poss):
-			if (rep(elt, possC[i], conv(essai)) != (nn,nb)):
-				S[i] = False
-		if (nn == 4):
-			break
-		print (str(nn) + "n" + str(nb) + "b\n")
-		nbEssai = nbEssai - 1
-	if (nbEssai == 0):
-		print ("Perdu ! Le code était : " + str(codeNb))
-	else:
-		print ("Félicitations ! Tu as gagné avec " + str(nbEssai-1) + " essai(s) restant(s) !")
-	
-		
-			
-			
-	
-	
-	
-	
-	
-	
-	
-	
-	
+import collections
+import itertools
+import random
+import sys
 
-	
-	
-	
+
+MAX_VALUE = 6
+NUM_DIGITS = 4
+NUM_TRIES = 6
+NUM_TOTAL_POSSIBILITIES = MAX_VALUE ** NUM_DIGITS
+
+_CODES = None
+_COUNT = None
+_POSSIBILITIES = None
+
+
+HELP_HELPER = ("Veuillez entrer soit 'state' pour connaitre les possibilités "
+               "restantes, soit 'help' pour connaitre le meilleur coup "
+               "possible, soit 'win' pour indiquer que vous avez gagné, soit "
+               "<code> <noirs> <blancs> pour mettre à jour.")
+
+HELP_FREE_GAME = ("Veuillez entrer soit 'state' pour connaitre les "
+                  "possibilités restantes, soit 'help' pour connaitre le "
+                  "meilleur coup possible, soit 'tries' pour connaitre le "
+                  "nombre d'essais restants, soit <code> pour proposer une "
+                  "réponse.")
+
+WELCOME = 'Bienvenue !'
+
+
+class Bot(object):
+  def __init__(self):
+    self.state = set(GetAllCodes())
+
+  def Reset(self):
+    self.__init__()
+
+  def GetState(self):
+    print 'Possibilités restantes: ' + str(sorted(list(self.state)))
+
+  def HasWon(self):
+    return not self.state
+
+  def GetAdvice(self):
+    min_max_possibilities = NUM_TOTAL_POSSIBILITIES
+    min_codes = []
+    for code in _CODES:
+      max_possibilities = max(
+          [len(possibilities.intersection(self.state))
+           for possibilities in GetPossibilities(code).values()])
+      if max_possibilities < min_max_possibilities:
+        min_max_possibilities = max_possibilities
+        min_codes = [code]
+      if max_possibilities == min_max_possibilities:
+        min_codes.append(code)
+    intersection = self.state.intersection(min_codes)
+    best_guess = min(min_codes)
+    if intersection:
+      best_guess = min(intersection)
+      print 'Meilleur coup: ' + best_guess
+
+  def Update(self, code, black, white):
+    self.state = self.state.intersection(GetPossibilities(code)[(black, white)])
+
+
+def Helper():
+  print WELCOME
+  print HELP_HELPER
+  bot = Bot()
+  while True:
+    user_input = raw_input()
+    if user_input == 'state':
+      bot.GetState()
+    elif user_input == 'help':
+      bot.GetAdvice()
+    elif user_input == 'win':
+      print 'Hourra ! Beaucoup trop facile !'
+      bot.Reset()
+    else:
+      try:
+        code, black, white = user_input.split(' ')
+        bot.Update(code, int(black), int(white))
+      except:
+        print HELP_HELPER
+
+
+class Game(object):
+  def __init__(self):
+    self.bot = Bot()
+    self.remaining_tries = NUM_TRIES
+    self.code = self.GenerateCode()
+
+  def Reset(self):
+    self.__init__()
+
+  def GenerateCode(self):
+    return GetAllCodes()[random.randint(0, NUM_TOTAL_POSSIBILITIES - 1)]
+
+
+def FreeGame():
+  game = Game()
+  print WELCOME
+  print HELP_FREE_GAME
+  while True:
+    user_input = raw_input()
+    if user_input == 'state':
+      game.bot.GetState()
+    elif user_input == 'help':
+      game.bot.GetAdvice()
+    else:
+      try:
+        black, white = ComputeProximity(user_input, game.code)
+        game.bot.Update(user_input, int(black), int(white))
+        game.remaining_tries -= 1
+        if black == NUM_DIGITS:
+          print 'Tu as gagné! Il te restait {} essai(s).'.format(
+              str(game.remaining_tries))
+          game.Reset()
+          continue
+        print 'Noirs: {} Blancs: {} Essais restants: {}'.format(
+            str(black), str(white), str(game.remaining_tries))
+        if not game.remaining_tries:
+          print 'Tu as perdu... Le code était: ' + game.code
+          game.Reset()
+      except:
+        print HELP_FREE_GAME
+
+
+def GetCount(code):
+  global _COUNT
+  if not _COUNT:
+    _COUNT = {}
+    for code_iterator in GetAllCodes():
+      _COUNT[code_iterator] = [0] * MAX_VALUE
+      for digit in code_iterator:
+        _COUNT[code_iterator][int(digit) - 1] += 1
+  return _COUNT[code]
+
+
+def GetAllCodes():
+  global _CODES
+  if not _CODES:
+    digits = [str(i) for i in xrange(1, MAX_VALUE + 1)]
+    _CODES = sorted([''.join(list_digits) for list_digits in
+                    itertools.product(*([digits] * NUM_DIGITS))])
+  return _CODES
+
+
+def ComputeProximity(n, m):
+  black = len([0 for d1, d2 in zip(n, m) if d1 == d2])
+  count_n = GetCount(n)
+  count_m = GetCount(m)
+  black_and_white = sum([min(c1, c2) for c1, c2 in zip(count_n, count_m)])
+  return black, black_and_white - black
+
+
+def GetPossibilities(code):
+  global _POSSIBILITIES
+  if not _POSSIBILITIES:
+    _POSSIBILITIES = collections.defaultdict(
+        lambda: collections.defaultdict(set))
+    for n in GetAllCodes():
+      for m in GetAllCodes():
+        if n < m:
+          proximity = ComputeProximity(n, m)
+          _POSSIBILITIES[n][proximity].add(m)
+          _POSSIBILITIES[m][proximity].add(n)
+  return _POSSIBILITIES[code]
+
+
+def main():
+  try:
+    game_mode = sys.argv[1].upper()
+  except:
+    FreeGame()
+    return
+  if game_mode == 'HELP':
+    Helper()
+  else:
+    FreeGame()
+
+if __name__ == '__main__':
+  main()
