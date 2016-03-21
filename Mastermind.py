@@ -23,8 +23,7 @@ HELP_HELPER = ("Veuillez entrer soit 'state' pour connaitre les possibilités "
 
 HELP_FREE_GAME = ("Veuillez entrer soit 'state' pour connaitre les "
                   "possibilités restantes, soit 'help' pour connaitre le "
-                  "meilleur coup possible, soit 'tries' pour connaitre le "
-                  "nombre d'essais restants, soit <code> pour proposer une "
+                  "meilleur coup possible, soit <code> pour proposer une "
                   "réponse.")
 
 WELCOME = 'Bienvenue !'
